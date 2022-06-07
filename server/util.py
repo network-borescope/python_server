@@ -2,7 +2,7 @@ import datetime
 import pandas as pd
 
 FIELDS = {
-    "stat": ["pop_src", "service", "epoch", "time"],
+    "stat": ["pop_src", "service", "timestamp", "time"],
     "ml": [ 
             "data", "dia_semana", "hora", "minuto",
             "id_client", "ip_origem_REQ_DNS", "dist_REQ_DNS", "TTL_REQ_DNS", 
@@ -88,10 +88,10 @@ if __name__ == "__main__":
     import json
 
     data = ""
-    with open("./input_demo/rnp_servicos_demo.txt", "r") as fin:
+    with open("../input_demo/rnp_servicos_demo.txt", "r") as fin:
         for line in fin:
             data += line
 
-    fields = ["pop_src", "service", "epoch", "time"]
+    fields = ["pop_src", "service", "timestamp", "time"]
     id, tp, data_frame, total_ms = build_dataframe(json.loads(data), fields)
     data_frame.to_csv("services_dataframe.csv")

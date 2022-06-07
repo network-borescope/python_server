@@ -21,10 +21,10 @@ MODELS = {
             },
         },
         "stat": { # Statistical Models
-            "all": {"model_function": my_stat.all, "dataframe_fields": util.FIELDS["stat"] },
-            "cdf": {"model_function": my_stat.cdf, "dataframe_fields": util.FIELDS["stat"] },
-            "foo1": {"model_function": my_stat.foo1, "dataframe_fields": util.FIELDS["stat"] },
-            "foo2": {"model_function": my_stat.foo2, "dataframe_fields": util.FIELDS["stat"] },
+            "all": {"model_function": lambda data_frame: my_stat.process_df(data_frame, my_stat.all), "dataframe_fields": util.FIELDS["stat"] },
+            "cdf": {"model_function": lambda data_frame: my_stat.process_df(data_frame, my_stat.cdf), "dataframe_fields": util.FIELDS["stat"] },
+            "ccdf": {"model_function": lambda data_frame: my_stat.process_df(data_frame, my_stat.ccdf), "dataframe_fields": util.FIELDS["stat"] },
+            "pdf": {"model_function": lambda data_frame: my_stat.process_df(data_frame, my_stat.pdf), "dataframe_fields": util.FIELDS["stat"] },
         }
 }
 
