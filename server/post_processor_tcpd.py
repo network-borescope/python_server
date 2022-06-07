@@ -80,7 +80,7 @@ def process_data(data, model, version=None):
             return error("Unable to build dataframe from data received. Data must be compatible with choosen model: " + model)
         
         id, tp, data_frame, total_ms = result
-        js_result = model_function(data_frame) # process data frame
+        js_result = model_function(data_frame) # processed data frame
     else:
         return error("No data to be processed.")
 

@@ -16,7 +16,7 @@ def cdf(data_list):
     result = []
 
     for i in range(len(data_list)):
-        result.append((x_cdf[i],y_cdf[i]))
+        result.append((int(x_cdf[i]),float(y_cdf[i])))
 
     return result
 
@@ -29,7 +29,7 @@ def ccdf(data_list):
     result = []
 
     for i in range(len(data_list)):
-        result.append((x_ccdf[i],y_ccdf[i]))
+        result.append((int(x_ccdf[i]),float(y_ccdf[i])))
 
     return result
 
