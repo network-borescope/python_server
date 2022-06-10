@@ -59,8 +59,8 @@ def all(data_list):
 def process_df(df, processfunction):
     response={}
 
-    for pop_id in range(1, 28):
-        for serv_id in range(1, 32):
+    for pop_id in range(0, 28):
+        for serv_id in range(0, 32):
             df_req = df.loc[(df['pop_src'] == pop_id) & (df['service'] == serv_id)]
 
             if df_req.empty: continue
