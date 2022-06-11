@@ -1,8 +1,10 @@
 import socket
 import json
-import machine_learning as ml
 import pickle
 import threading
+import time
+
+import machine_learning as ml
 import util
 import my_stat
 
@@ -56,7 +58,7 @@ def get_model_function(model):
         return None, None
     
     
-    return model_function, dataframe_fields
+    return model_name, model_function, dataframe_fields
 
 
 ###############################################
@@ -64,12 +66,15 @@ def get_model_function(model):
 ###############################################
 def process_data(data, model, version=None):
     print("Process data", model)
+    
+    start = time.process_time()
+    
     try:
         data_json = json.loads(data)
     except:
         return error("Data received isn't a valid JSON.")
     
-    model_function, dataframe_fields = get_model_function(model)
+    model_name, model_function, dataframe_fields = get_model_function(model)
     if model_function is None:
         return error('Unknow model ' + model + '.')
     
@@ -84,7 +89,8 @@ def process_data(data, model, version=None):
     else:
         return error("No data to be processed.")
 
-    response_json = {"id": id, "tp": tp, "result": js_result, "ms": total_ms}
+    elapsed = (time.process_time() - start)*1000 # multiply by 1000 to convert to milliseconds
+    response_json = {"id": id, "tp": tp, "result": js_result, "model": model_name, "ms": total_ms + elapsed}
     return response_json
 
 
