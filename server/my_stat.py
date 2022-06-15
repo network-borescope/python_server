@@ -4,46 +4,57 @@
 
 import pandas as pd
 import numpy as np
-import seaborn as sns
+import math
+
+# CDF
+def cdf(lista):
+    x_cdf = lista
+    y_cdf = 1. * np.arange(len(lista)) / (len(lista) - 1)
+
+    result = {}
+    for i in range(len(lista)):
+        result[int(x_cdf[i])] = float(y_cdf[i])
+
+    return list(result.items())
+
+# CCDF
+def ccdf(lista):
+    x_ccdf = lista
+    y_ccdf = 1 - (1. * np.arange(len(lista)) / (len(lista) - 1))
+
+    result = {}
+    for i in range(len(lista)):
+        if int(x_ccdf[i]) not in result:
+            result[int(x_ccdf[i])] = float(y_ccdf[i])
+
+    return list(result.items())
 
 
+# PDF
+def pdf(lista):
+    x_pdf = lista
 
-#CDF
-def cdf(data_list):
-    x_cdf=np.sort(data_list)
-    y_cdf = 1. * np.arange(len(data_list)) / (len(data_list) - 1)
+    # Media
+    soma = 0
+    for x in x_pdf:
+        soma += x
 
-    result = []
+    avg = soma / len(x_pdf)
 
-    for i in range(len(data_list)):
-        result.append((int(x_cdf[i]),float(y_cdf[i])))
+    # desvio padrão
+    soma2 = 0
+    for x in x_pdf:
+        soma2 = soma2 + math.pow((x - avg), 2)
 
-    return result
+    var = soma2 / len(x_pdf)
+    desv = math.sqrt(var)
 
+    result = {}
+    for x in x_pdf:
+        y_pdfi = (1.0 / desv*math.sqrt(2*math.pi))*(math.exp(-0.5*math.pow((x-avg)/desv,2)))
+        result[int(x)] = float(y_pdfi)
 
-#CCDF
-def ccdf(data_list):
-    x_ccdf=np.sort(data_list)
-    y_ccdf = 1 - (1. * np.arange(len(data_list)) / (len(data_list) - 1))
-
-    result = []
-
-    for i in range(len(data_list)):
-        result.append((int(x_ccdf[i]),float(y_ccdf[i])))
-
-    return result
-
-
-#PDF
-def pdf(data_list):
-    x_pdf,y_pdf=sns.distplot(data_list).get_lines()[0].get_data()
-
-    result = []
-
-    for i in range(len(x_pdf)):
-        result.append((x_pdf[i],y_pdf[i]))
-
-    return result
+    return list(result.items())
 
 
 def all(data_list):
@@ -52,20 +63,22 @@ def all(data_list):
     results[0] = cdf(data_list)
     results[1] = ccdf(data_list)
     results[2] = pdf(data_list)
-    
+
     return results
 
 
 def process_df(df, processfunction):
-    response={}
-
-    for pop_id in range(0, 28):
-        for serv_id in range(0, 32):
+    response = {}
+    pops = list(map(int, df.pop_src.unique()))
+    servs = list(map(int, df.service.unique()))
+  
+    for pop_id in pops:
+        for serv_id in servs:
             df_req = df.loc[(df['pop_src'] == pop_id) & (df['service'] == serv_id)]
 
             if df_req.empty: continue
 
-            time = df_req['time'].tolist() #convert into a list
+            time = np.sort(df_req.time.tolist()) # get sorted "time" list
 
             if not pop_id in response:
                 response[pop_id] = {}
