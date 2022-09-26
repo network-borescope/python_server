@@ -95,9 +95,5 @@ if __name__ == "__main__":
     data = ""
     filename = sys.argv[1]
     with open(filename, "r") as fin:
-        for line in fin:
-            data += line
-
-    fields = ["pop_src", "service", "timestamp", "time"]
-    id, tp, data_frame, total_ms = build_dataframe(json.loads(data), fields)
-    data_frame.to_csv(filename[:-3]+"csv")
+        id, tp, data_frame, total_ms = build_dataframe(json.load(fin), FIELDS["stat"])
+        data_frame.to_csv(filename[:filename.rfind(".")]+".csv")
