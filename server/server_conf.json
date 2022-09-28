@@ -1,0 +1,44 @@
+{
+    "host": "127.0.0.1",
+    "port": 8080,
+    "max_data_sz": 60000000,
+    "models": {
+        "ml": {
+            "isolation-forest": {
+                "py_module": "machine_learning",
+                "py_function": "callable",
+                "dataframe_fields": [
+                    "data", "dia_semana", "hora", "minuto",
+                    "id_client", "ip_origem_REQ_DNS", "dist_REQ_DNS", "TTL_REQ_DNS", 
+                    "ip_destino_REQ_DNS", "ip-id_REQ_DNS", "flag_+_REQ_DNS", "flag_%_REQ_DNS",
+                    "flag_*_RESP_DNS", "flag_-_RESP_DNS", "flag_|_RESP_DNS", "flag_$_RESP_DNS",
+                    "ip_orig_REQ_WEB", "dist_REQ_WEB", "TTL_REQ_WEB", "port_dest_REQ_WEB",
+                    "serv", "ip_dest_REQ_WEB", "query_fei_REQ_DNS_acess_REQ_WEB", "deltatime"
+                ],
+                "model_file": "models/isolation_forest.sav"
+            }
+        },
+        "stat": {
+            "all": {
+                "py_module": "my_stat",
+                "py_function": "process_all",
+                "dataframe_fields": ["pop_src", "service", "timestamp", "time"]
+            },
+            "cdf": {
+                "py_module": "my_stat",
+                "py_function": "process_cdf",
+                "dataframe_fields": ["pop_src", "service", "timestamp", "time"]
+            },
+            "ccdf": {
+                "py_module": "my_stat",
+                "py_function": "process_ccdf",
+                "dataframe_fields": ["pop_src", "service", "timestamp", "time"]
+            },
+            "pdf": {
+                "py_module": "my_stat",
+                "py_function": "process_pdf",
+                "dataframe_fields": ["pop_src", "service", "timestamp", "time"]
+            }
+        }
+    }
+}

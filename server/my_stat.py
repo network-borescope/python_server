@@ -86,3 +86,12 @@ def process_df(df, processfunction):
             response[pop_id][serv_id] = processfunction(time)
 
     return response
+
+
+def process_all(df): return process_df(df, all)
+
+def process_cdf(df): return process_df(df, cdf)
+
+def process_ccdf(df): return process_df(df, ccdf)
+
+def process_pdf(df): return process_df(df, pdf)

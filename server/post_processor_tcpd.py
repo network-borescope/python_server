@@ -3,32 +3,19 @@ import json
 import pickle
 import threading
 import time
+import importlib
 
-import machine_learning as ml
+# server utilitie libraries
 import util
-import my_stat
 
-HOSTNAME = "127.0.0.1" # "localhost"
-SERVER_PORT = 8080
+
+# globals
+HOST = None
+SERVER_PORT = None
+MAX_DATA_SIZE = None
+MODELS = None
+DEFAULT_MODEL = None
 BUFFER_SIZE = 4096
-MAX_DATA_SIZE = 50 * 10**6 # 50MB
-DEFAULT_MODEL = "/ml/isolation-forest"
-MODELS = {
-        "ml": { # Machine Learning Models
-            "isolation-forest": {
-                "loaded_model": None,
-                "model_file": "models/isolation_forest.sav",
-                "model_function": lambda data_frame: ml.callable(data_frame, MODELS["ml"]["isolation-forest"]["loaded_model"]),
-                "dataframe_fields": util.FIELDS["ml"]
-            },
-        },
-        "stat": { # Statistical Models
-            "all": {"model_function": lambda data_frame: my_stat.process_df(data_frame, my_stat.all), "dataframe_fields": util.FIELDS["stat"] },
-            "cdf": {"model_function": lambda data_frame: my_stat.process_df(data_frame, my_stat.cdf), "dataframe_fields": util.FIELDS["stat"] },
-            "ccdf": {"model_function": lambda data_frame: my_stat.process_df(data_frame, my_stat.ccdf), "dataframe_fields": util.FIELDS["stat"] },
-            "pdf": {"model_function": lambda data_frame: my_stat.process_df(data_frame, my_stat.pdf), "dataframe_fields": util.FIELDS["stat"] },
-        }
-}
 
 
 
@@ -92,20 +79,6 @@ def process_data(data, model, version=None):
     elapsed = (time.process_time() - start)*1000 # multiply by 1000 to convert to milliseconds
     response_json = {"id": id, "tp": tp, "result": js_result, "model": model_name, "ms": total_ms + elapsed}
     return response_json
-
-
-###############################################
-## Load Machine Learning Models
-###############################################
-def load_models(reload=False):
-    print("Loading models...")
-
-    for model_item in MODELS["ml"].items():
-        model = model_item[1]
-        if model["loaded_model"] is None or reload:
-            model["loaded_model"] = pickle.load(open(model["model_file"], 'rb'))
-
-            print(model_item[0][1:], "Ok.")
 
 
 ###############################################
@@ -212,18 +185,78 @@ def conn_task(conn, addr, thread_count):
             if len(data) > MAX_DATA_SIZE:
                 break
 
-        print("Closed connection with", addr, "-> Thread", thread_count)
+        print("Closed connection with", addr, "-> Thread", thread_count)  
 
+
+
+###############################################
+## Load Machine Learning Models
+###############################################
+def load_models(reload=False):
+    print("Loading models...")
+
+    for model_item in MODELS["ml"].items():
+        model = model_item[1]
+        if not model["loaded_model"] or reload:
+            model["loaded_model"] = pickle.load(open(model["model_file"], 'rb'))
+
+            print("-", model_item[0], "Ok.")
+    print("Finished!")
+
+
+
+###############################################
+## Load server conf
+###############################################
+def load_conf(conf_file="server_conf.json"):
+    global HOST, SERVER_PORT, MAX_DATA_SIZE, DEFAULT_MODEL, MODELS
+
+    server_conf = None
+    with open(conf_file, "r") as f:
+        server_conf = json.load(f)
+
+    try:
+        HOST = server_conf["host"]
+        SERVER_PORT = server_conf["port"]
+        MAX_DATA_SIZE = server_conf["max_data_sz"]
+        MODELS = server_conf["models"]
+        for model_type in MODELS:
+            for model_name in MODELS[model_type]:
+                model_options = MODELS[model_type][model_name]                                 
+                m = MODELS[model_type][model_name]
+
+                module = importlib.import_module(model_options.pop("py_module"))
+                m["model_function"] = getattr(module, model_options.pop("py_function"))
+
+                # model that has to be loaded
+                if "model_file" in m:
+                    m["loaded_model"] = False
+
+                if DEFAULT_MODEL is None:
+                    DEFAULT_MODEL = "/" + model_type + "/" + model_name
+                
+    except Exception as e:
+        print(e)
+        return False
+
+    print(HOST, SERVER_PORT, MAX_DATA_SIZE, DEFAULT_MODEL)
+    return True
 
 
 
 if __name__ == "__main__":
+    import sys
+
+    if not load_conf():
+        print("Failed to load server conf!")
+        sys.exit(1)
+
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((HOSTNAME, SERVER_PORT))
+        s.bind((HOST, SERVER_PORT))
         s.listen()
         
         load_models()
-        print("TCP Server Started!!!")
+        print("TCP Server Started ({}, {})!!!".format(HOST, SERVER_PORT))
 
         queue = [] # [(conn, addr)]
 
