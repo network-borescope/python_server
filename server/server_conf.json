@@ -16,6 +16,11 @@
                     "serv", "ip_dest_REQ_WEB", "query_fei_REQ_DNS_acess_REQ_WEB", "deltatime"
                 ],
                 "model_file": "models/isolation_forest.sav"
+            },
+            "hybrid_cf": {
+                "py_module": "hybrid_CF",
+                "py_function": "cf_predict_hours",
+                "dataframe_fields": ["pop_src", "service", "timestamp", "time"]
             }
         },
         "stat": {

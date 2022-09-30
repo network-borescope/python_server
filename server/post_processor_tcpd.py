@@ -40,12 +40,16 @@ def get_model_function(model):
         model_type, model_name = model[1:].split("/")
         model_function = MODELS[model_type][model_name]["model_function"]
         dataframe_fields = MODELS[model_type][model_name]["dataframe_fields"]
+        loaded_model = None
+        
+        if "loaded_model" in MODELS[model_type][model_name]:
+            loaded_model = MODELS[model_type][model_name]["loaded_model"]
     
     except:
         return None, None
     
     
-    return model_name, model_function, dataframe_fields
+    return model_name, model_function, loaded_model, dataframe_fields
 
 
 ###############################################
@@ -61,7 +65,7 @@ def process_data(data, model, version=None):
     except:
         return error("Data received isn't a valid JSON.")
     
-    model_name, model_function, dataframe_fields = get_model_function(model)
+    model_name, model_function, loaded_model, dataframe_fields = get_model_function(model)
     if model_function is None:
         return error('Unknow model ' + model + '.')
     
@@ -72,7 +76,13 @@ def process_data(data, model, version=None):
             return error("Unable to build dataframe from data received. Data must be compatible with choosen model: " + model)
         
         id, tp, data_frame, total_ms = result
-        js_result = model_function(data_frame) # processed data frame
+        if loaded_model:
+            js_result = model_function(data_frame, model_function) # processed data frame
+        else:
+            js_result = model_function(data_frame) # processed data frame
+
+        if js_result is None:
+            return error("Unable to apply model '" + model + "' in received data.")
     else:
         return error("No data to be processed.")
 
@@ -197,7 +207,7 @@ def load_models(reload=False):
 
     for model_item in MODELS["ml"].items():
         model = model_item[1]
-        if not model["loaded_model"] or reload:
+        if ("loaded_model" in model and not model["loaded_model"]) or reload:
             model["loaded_model"] = pickle.load(open(model["model_file"], 'rb'))
 
             print("-", model_item[0], "Ok.")
