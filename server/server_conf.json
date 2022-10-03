@@ -20,29 +20,49 @@
             "hybrid_cf": {
                 "py_module": "hybrid_CF",
                 "py_function": "cf_predict_hours",
-                "dataframe_fields": ["pop_src", "service", "timestamp", "time"]
+                "dataframe_fields": {
+                    "info": ["pop", "service"],
+                    "k": ["timestamp"],
+                    "v": ["time"]
+                }
             }
         },
         "stat": {
             "all": {
                 "py_module": "my_stat",
                 "py_function": "process_all",
-                "dataframe_fields": ["pop_src", "service", "timestamp", "time"]
+                "dataframe_fields": {
+                    "info": ["pop", "service"],
+                    "k": ["timestamp"],
+                    "v": ["time"]
+                }
             },
             "cdf": {
                 "py_module": "my_stat",
                 "py_function": "process_cdf",
-                "dataframe_fields": ["pop_src", "service", "timestamp", "time"]
+                "dataframe_fields": {
+                    "info": ["pop", "service"],
+                    "k": ["timestamp"],
+                    "v": ["time"]
+                }
             },
             "ccdf": {
                 "py_module": "my_stat",
                 "py_function": "process_ccdf",
-                "dataframe_fields": ["pop_src", "service", "timestamp", "time"]
+                "dataframe_fields": {
+                    "info": ["pop", "service"],
+                    "k": ["timestamp"],
+                    "v": ["time"]
+                }
             },
             "pdf": {
                 "py_module": "my_stat",
                 "py_function": "process_pdf",
-                "dataframe_fields": ["pop_src", "service", "timestamp", "time"]
+                "dataframe_fields": {
+                    "info": ["pop", "service"],
+                    "k": ["timestamp"],
+                    "v": ["time"]
+                }
             }
         }
     }

@@ -69,12 +69,12 @@ def all(data_list):
 
 def process_df(df, processfunction):
     response = {}
-    pops = list(map(int, df.pop_src.unique()))
-    servs = list(map(int, df.service.unique()))
+    pops = list(map(int, df["pop"].unique()))
+    servs = list(map(int, df["service"].unique()))
   
     for pop_id in pops:
         for serv_id in servs:
-            df_req = df.loc[(df['pop_src'] == pop_id) & (df['service'] == serv_id)]
+            df_req = df.loc[(df['pop'] == pop_id) & (df['service'] == serv_id)]
 
             if df_req.empty: continue
 

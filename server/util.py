@@ -12,12 +12,18 @@ def build_dataframe(data_json, dataframe_fields):
     id = None
     tp = None
     total_ms = 0.0
-    frame_dict = {} # dict that will be transformed in data frame
+
+    columns = []
+    for _, fields in dataframe_fields.items():
+        columns += fields
+
+    data = []
 
     count = -1
     for obj in data_json:
-        pop = obj["pop"]
-        service = obj["service"]
+        row_prefix = []
+        for item in dataframe_fields["info"]:
+            row_prefix.append(obj[item])
         
         if obj["data"]["tp"] == 0: continue
 
@@ -27,18 +33,32 @@ def build_dataframe(data_json, dataframe_fields):
         total_ms = total_ms + obj["data"]["ms"]
 
         for result_data in obj["data"]["result"]:
+            row = []
             count += 1
-            # convert epoch to timestamp
-            date = datetime.datetime.fromtimestamp(result_data["k"][0])
-            frame_dict[count] = [pop, service, date, result_data["v"][0]]
+            for i,item in enumerate(result_data["k"]):
+                # first k is timestamp (epoch)
+                if i == 0:
+                    row.append(datetime.datetime.fromtimestamp(item))
+                else:
+                    row.append(item)
+            
+            for item in result_data["v"]:
+                row.append(item)
 
-    try:
-        data_frame = pd.DataFrame.from_dict(data=frame_dict, orient='index', columns=dataframe_fields)
-    except:
-        return None
+            row = row_prefix+row
+            if len(row) == len(columns):
+                data.append(row)
+            else:
+                print(row)
     
-    return id, tp, data_frame, total_ms
+    data_frame = None
+    try:
+        data_frame = pd.DataFrame(data, columns=columns)
+    except Exception as e:
+        print(e)
+        return None
 
+    return id, tp, data_frame, total_ms
 
 ######################################################
 ## Build str from data received

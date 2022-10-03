@@ -102,8 +102,8 @@ def cf_predict_values(data_matrix):
     return mat
 
 def cf_predict_hours(data):
-    pops_ct = list(map(int, data.pop_src.unique()))
-    servs_ct = list(map(int, data.service.unique()))
+    pops_ct = list(map(int, data["pop"].unique()))
+    servs_ct = list(map(int, data["service"].unique()))
     if len(pops_ct) > 1 and len(servs_ct) > 1:
         resp = []
         init = data.min()["timestamp"]
@@ -117,7 +117,7 @@ def cf_predict_hours(data):
                 mat = np.zeros((pops,servs))
                 for i in range(len(mat)):
                     for j in range(len(mat[i])):
-                        mat[i][j] = df.loc[(df["pop_src"] ==  i) & (df["service"] == j)]["time"].mean() if not df.loc[(df["pop_src"] ==  i) & (df["service"] == j)].empty else 0
+                        mat[i][j] = df.loc[(df["pop"] ==  i) & (df["service"] == j)]["time"].mean() if not df.loc[(df["pop"] ==  i) & (df["service"] == j)].empty else 0
 
                 for i in range(len(mat)):
                     for j in range(len(mat[i])):
