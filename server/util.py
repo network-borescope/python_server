@@ -21,16 +21,16 @@ def build_dataframe(data_json, dataframe_fields):
 
     count = -1
     for obj in data_json:
-        row_prefix = []
-        for item in dataframe_fields["info"]:
-            row_prefix.append(obj[item])
-        
         if obj["data"]["tp"] == 0: continue
 
         if id is None: id = obj["data"]["id"]
         if tp is None: tp = obj["data"]["tp"]
         
         total_ms = total_ms + obj["data"]["ms"]
+
+        row_prefix = []
+        for item in dataframe_fields["info"]:
+            row_prefix.append(obj[item])
 
         for result_data in obj["data"]["result"]:
             row = []
@@ -63,10 +63,10 @@ def build_dataframe(data_json, dataframe_fields):
 ######################################################
 ## Build str from data received
 ######################################################
-def build_str(data_json, info_columns, delimeter=','):
+def build_str(data_json, row_fields, delimeter=','):
     id = None
     tp = None
-    total_ms = 0.0
+    total_ms = 0.0   
     str_arr = []
     
     for obj in data_json:       
@@ -77,22 +77,21 @@ def build_str(data_json, info_columns, delimeter=','):
         total_ms = total_ms + obj["data"]["ms"]
 
         line_prefix = ""
-
-        for key in info_columns:
+        for item in row_fields["info"]:
             if len(line_prefix) == 0:
-                line_prefix = str(obj[key])
+                line_prefix += str(obj[item])
             else:
-                line_prefix += delimeter + str(obj[key])
+                line_prefix += delimiter + str(obj[item])
 
         for result_data in obj["data"]["result"]:
             line = ""
             
-            for key in result_data["k"]:
-                # try convert epoch to timestamp
-                try:
-                    line += delimeter + str(datetime.datetime.fromtimestamp(key))
-                except:
-                    line += delimeter + str(key)
+            for i,item in enumerate(result_data["k"]):
+                # first k is timestamp (epoch)
+                if i == 0:
+                    line += delimiter + str(datetime.datetime.fromtimestamp(item))
+                else:
+                    line += delimiter + str(item)
             
             for value in result_data["v"]:
                 line += delimeter + str(value)

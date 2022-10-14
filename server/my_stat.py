@@ -78,7 +78,7 @@ def process_df(df, processfunction):
 
             if df_req.empty: continue
 
-            time = np.sort(df_req.time.tolist()) # get sorted "time" list
+            time = np.sort(df_req["time"].tolist()) # get sorted "time" list
 
             if not pop_id in response:
                 response[pop_id] = {}

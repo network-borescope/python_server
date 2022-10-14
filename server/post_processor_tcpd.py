@@ -29,6 +29,20 @@ def error(error_desc):
     return response
 
 
+def know_models(model):
+    try:
+        model_type, model_name = model[1:].split("/")
+        return model_type, model_name
+    except:
+        for know_model_type in MODELS:
+            for know_model_name in MODELS[know_model_type]:
+                if know_model_name == model:
+                    return know_model_type, know_model_name
+    
+        return None, None
+
+
+
 ###############################################
 ## Get choosen model function and fields
 ###############################################
@@ -36,8 +50,8 @@ def get_model_function(model):
     try:
         if model == "/":
             model = DEFAULT_MODEL
-
-        model_type, model_name = model[1:].split("/")
+      
+        model_type, model_name = know_models(model)
         model_function = MODELS[model_type][model_name]["model_function"]
         dataframe_fields = MODELS[model_type][model_name]["dataframe_fields"]
         loaded_model = None
@@ -45,8 +59,9 @@ def get_model_function(model):
         if "loaded_model" in MODELS[model_type][model_name]:
             loaded_model = MODELS[model_type][model_name]["loaded_model"]
     
-    except:
-        return None, None
+    except Exception as e:
+        print(e)
+        return None, None, None, None
     
     
     return model_name, model_function, loaded_model, dataframe_fields
@@ -121,8 +136,8 @@ def header_parser(str):
     i += 1 # consume whitespace
 
     # must be "/" to indentify model
-    if str[i] != "/":
-        return None
+    #if str[i] != "/":
+        #return None
     
     while i < len(str):
         if str[i] == "\r":
