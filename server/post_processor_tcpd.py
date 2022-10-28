@@ -29,6 +29,9 @@ def error(error_desc):
     return response
 
 
+###############################################
+## Search "model" in MODELS dict (know models)
+###############################################
 def know_models(model):
     try:
         model_type, model_name = model[1:].split("/")
@@ -72,6 +75,7 @@ def get_model_function(model):
 ###############################################
 def process_data(data, model, version=None):
     print("Process data", model)
+    tc_format = True # response in tinycubes format
     
     start = time.process_time()
     
@@ -85,7 +89,12 @@ def process_data(data, model, version=None):
         return error('Unknow model ' + model + '.')
     
     if len(data_json) > 0:
-        result = util.build_dataframe(data_json, dataframe_fields)
+        result = None
+        if "result" not in data_json:
+            result = util.build_dataframe(data_json, dataframe_fields)
+        else:
+            result = util.build_dataframe(data_json["result"], dataframe_fields)
+            tc_format = False
 
         if result is None:
             return error("Unable to build dataframe from data received. Data must be compatible with choosen model: " + model)
@@ -102,7 +111,12 @@ def process_data(data, model, version=None):
         return error("No data to be processed.")
 
     elapsed = (time.process_time() - start)*1000 # multiply by 1000 to convert to milliseconds
-    response_json = {"id": id, "tp": tp, "result": js_result, "model": model_name, "ms": total_ms + elapsed}
+    
+    response_json = None
+    if tc_format:
+        response_json = {"id": id, "tp": tp, "result": js_result, "model": model_name, "ms": total_ms + elapsed}
+    else:
+        response_json = {"result": js_result, "model": model_name}
     return response_json
 
 

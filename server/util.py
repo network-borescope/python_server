@@ -13,6 +13,9 @@ def build_dataframe(data_json, dataframe_fields):
     tp = None
     total_ms = 0.0
 
+    # check if data_frame should be build
+    if not dataframe_fields: return id, tp, data_json, total_ms
+
     columns = []
     for _, fields in dataframe_fields.items():
         columns += fields
@@ -66,7 +69,11 @@ def build_dataframe(data_json, dataframe_fields):
 def build_str(data_json, row_fields, delimeter=','):
     id = None
     tp = None
-    total_ms = 0.0   
+    total_ms = 0.0
+
+    # check if data_frame should be build
+    if not dataframe_fields: return id, tp, data_json, total_ms
+
     str_arr = []
     
     for obj in data_json:       
