@@ -26,6 +26,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s, open(filename, "r")
     
     # missing header
     #data = bytes(data, 'utf-8') + b"\r\n\r\n"
+
+    # missing end
+    #data = bytes("# 1.0 {}\r\n".format(model), 'utf-8') + bytes(data, 'utf-8')
     s.sendall(data)
     
 

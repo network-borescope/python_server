@@ -1,0 +1,7 @@
+{
+    "hybrid_cf": {
+        "py_module": "hybrid_CF",
+        "py_function": "cf_predict_delta_matrix",
+        "dataframe_fields": false
+    }
+}

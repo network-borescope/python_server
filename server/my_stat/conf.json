@@ -1,0 +1,38 @@
+{
+    "all": {
+        "py_module": "my_stat",
+        "py_function": "process_all",
+        "dataframe_fields": {
+            "info": ["pop", "service"],
+            "k": ["timestamp"],
+            "v": ["time"]
+        }
+    },
+    "cdf": {
+        "py_module": "my_stat",
+        "py_function": "process_cdf",
+        "dataframe_fields": {
+            "info": ["pop", "service"],
+            "k": ["timestamp"],
+            "v": ["time"]
+        }
+    },
+    "ccdf": {
+        "py_module": "my_stat",
+        "py_function": "process_ccdf",
+        "dataframe_fields": {
+            "info": ["pop", "service"],
+            "k": ["timestamp"],
+            "v": ["time"]
+        }
+    },
+    "pdf": {
+        "py_module": "my_stat",
+        "py_function": "process_pdf",
+        "dataframe_fields": {
+            "info": ["pop", "service"],
+            "k": ["timestamp"],
+            "v": ["time"]
+        }
+    }
+}

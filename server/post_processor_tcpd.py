@@ -4,6 +4,8 @@ import pickle
 import threading
 import time
 import importlib
+import os
+import subprocess
 
 # server utilitie libraries
 import util
@@ -13,8 +15,9 @@ import util
 HOST = None
 SERVER_PORT = None
 MAX_DATA_SIZE = None
+CONN_TIMEOUT_S = None
 MODELS = None
-DEFAULT_MODEL = None
+# DEFAULT_MODEL = None
 BUFFER_SIZE = 4096
 
 
@@ -51,8 +54,8 @@ def know_models(model):
 ###############################################
 def get_model_function(model):
     try:
-        if model == "/":
-            model = DEFAULT_MODEL
+        # if model == "/":
+        #     model = DEFAULT_MODEL
       
         model_type, model_name = know_models(model)
         model_function = MODELS[model_type][model_name]["model_function"]
@@ -123,19 +126,22 @@ def process_data(data, model, version=None):
 ###############################################
 ## Protocol Header Parser
 ###############################################
-def header_parser(str):
+def header_parser(header):
+    if header[:2] != "# ":
+        return None
+
     version = ""
     i = 2 # index begins at 2 because str begins with "# "
     
     # must start with version number
-    if not ("0" <= str[i] <= "9"):
+    if not ("0" <= header[i] <= "9"):
         return None
-    version += str[i]
+    version += header[i]
 
     i += 1
     while True: # get rest of version number(float)
-        if ("0" <= str[i] <= "9") or str[i] == ".":
-            version += str[i]
+        if ("0" <= header[i] <= "9") or header[i] == ".":
+            version += header[i]
             i += 1
         else:
             break # end of version number
@@ -145,18 +151,18 @@ def header_parser(str):
     except ValueError:
         return None
     
-    if str[i] != " ":
+    if header[i] != " ":
         return None
     i += 1 # consume whitespace
 
     # must be "/" to indentify model
-    #if str[i] != "/":
+    #if header[i] != "/":
         #return None
     
-    while i < len(str):
-        if str[i] == "\r":
+    while i < len(header):
+        if header[i] == "\r":
             i += 1
-            if str[i] == "\n":
+            if header[i] == "\n":
                 return i # end of the HEADER
             else:
                 return None
@@ -180,49 +186,49 @@ def conn_task(conn, addr, thread_count):
         model = None # desired model
         buffer_str = None # current string in buffer
         response_json = None # awnser that will be sent
-        
+
+        # process header
+        buffer_str = conn.recv(BUFFER_SIZE).decode("utf-8")
+        header_end = header_parser(buffer_str)
+
+        if header_end:
+            _, version, model = buffer_str[:header_end].split(" ") # "# <version> <model>"
+            model = model.strip().lower()
+            buffer_str = buffer_str[header_end+1:]
+
         while True:
-            buffer = conn.recv(BUFFER_SIZE)
-            buffer_str = buffer.decode("utf-8")
+            try:
+                if buffer_str[-4:] == "\r\n\r\n":
+                    if header_end is None:
+                        response_json = error("Missing Header. Expected '# <version> <path>'.")
+                    else:
+                        data += buffer_str
+                        
+                        # processing data
+                        response_json = process_data(data, model, version)
 
-            if buffer_str[:2] == "# ":
-                header_end = header_parser(buffer_str)
-
-                if header_end is None:
-                    response_json = error("Header Error. Expected \"# <version> <path>\"")
-
-                    # sending error message
+                    # sending awnser
                     response_str = json.JSONEncoder().encode(response_json)
                     response_bytes = response_str.encode("utf-8")
                     conn.sendall(response_bytes)
                     
                     # closing connection
+                    break 
+
+                data += buffer_str
+
+                if len(data) > MAX_DATA_SIZE:
                     break
                 
-                _, version, model = buffer_str[:header_end].split(" ") # "# <version> <model>"
-                model = model.strip().lower()
-                buffer_str = buffer_str[header_end+1:]
-
-            if buffer_str[-4:] == "\r\n\r\n":
-                if header_end is None:
-                    response_json = error("Missing Header. Expected \"# <version> <path>\"")
-                else:
-                    data += buffer_str
-                    # processing data
-                    response_json = process_data(data, model, version)
-
-                # sending awnser
+                buffer_str = conn.recv(BUFFER_SIZE).decode("utf-8")
+            
+            except socket.timeout as e:
+                response_json = error("Connection timeout.")
                 response_str = json.JSONEncoder().encode(response_json)
                 response_bytes = response_str.encode("utf-8")
                 conn.sendall(response_bytes)
-                
-                # closing connection
-                break 
-
-            data += buffer_str
-
-            if len(data) > MAX_DATA_SIZE:
                 break
+
 
         print("Closed connection with", addr, "-> Thread", thread_count)  
 
@@ -248,7 +254,7 @@ def load_models(reload=False):
 ## Load server conf
 ###############################################
 def load_conf(conf_file="server_conf.json"):
-    global HOST, SERVER_PORT, MAX_DATA_SIZE, DEFAULT_MODEL, MODELS
+    global HOST, SERVER_PORT, MAX_DATA_SIZE, CONN_TIMEOUT_S, DEFAULT_MODEL, MODELS
 
     server_conf = None
     with open(conf_file, "r") as f:
@@ -258,27 +264,60 @@ def load_conf(conf_file="server_conf.json"):
         HOST = server_conf["host"]
         SERVER_PORT = server_conf["port"]
         MAX_DATA_SIZE = server_conf["max_data_sz"]
-        MODELS = server_conf["models"]
-        for model_type in MODELS:
-            for model_name in MODELS[model_type]:
-                model_options = MODELS[model_type][model_name]                                 
-                m = MODELS[model_type][model_name]
-
-                module = importlib.import_module(model_options.pop("py_module"))
-                m["model_function"] = getattr(module, model_options.pop("py_function"))
-
-                # model that has to be loaded
-                if "model_file" in m:
-                    m["loaded_model"] = False
-
-                if DEFAULT_MODEL is None:
-                    DEFAULT_MODEL = "/" + model_type + "/" + model_name
+        CONN_TIMEOUT_S = server_conf["conn_timeout_sec"]
                 
     except Exception as e:
-        print(e)
+        print("server_conf.json file error", e)
         return False
 
-    print(HOST, SERVER_PORT, MAX_DATA_SIZE, DEFAULT_MODEL)
+    # search for models(modules)
+    MODELS = {}
+    imported_modules = {} # imported python files
+
+    # scan current dir for python models
+    for item in os.listdir():
+        if item[0] == '.' or item[:2] == "__" or not os.path.isdir(item):
+            continue
+        
+        conf_file = item+"/conf.json"
+        if not os.path.exists(conf_file):
+            continue
+        
+        # look for conf file of the model
+        with open(conf_file, "r") as f:
+            models_conf = json.load(f)
+
+            # install module dependencies from requirements file
+            req_file = "{}/requirements.txt".format(item)
+            if os.path.exists(req_file):
+                cmd = subprocess.run(["pip", "install", "-r", req_file])
+                if cmd:
+                    print("Failed to install requirements of package/model \"{}\".".format(item))
+
+            for model_name in models_conf:
+                model = models_conf[model_name]
+
+                py_module = "{}.{}".format(item, model.pop("py_module"))
+                
+                module = None # obj representing imported python file
+                if py_module not in imported_modules:
+                    module = importlib.import_module(py_module)
+                    imported_modules[py_module] = module
+                else:
+                    module = imported_modules[py_module]
+
+                model["model_function"] = getattr(module, model.pop("py_function"))
+
+                if item not in MODELS:
+                    MODELS[item] = {}
+                
+                MODELS[item][model_name] = model
+
+                # if DEFAULT_MODEL is None:
+                #     DEFAULT_MODEL = "/{}/{}".format(item, model_name)
+
+    # print(HOST, SERVER_PORT, MAX_DATA_SIZE, DEFAULT_MODEL)
+    print(HOST, SERVER_PORT, MAX_DATA_SIZE)
     return True
 
 
@@ -294,13 +333,14 @@ if __name__ == "__main__":
         s.bind((HOST, SERVER_PORT))
         s.listen()
         
-        load_models()
-        print("TCP Server Started ({}, {})!!!".format(HOST, SERVER_PORT))
+        # load_models()
+        print("TCP Server Started ({}, {}).".format(HOST, SERVER_PORT))
 
         queue = [] # [(conn, addr)]
 
         while True:
             conn, addr = s.accept()
+            conn.settimeout(CONN_TIMEOUT_S)
     
             t = threading.Thread(target=conn_task, args=(conn, addr, threading.active_count()))
             t.start()
