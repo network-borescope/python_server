@@ -64,13 +64,15 @@ def get_model_function(model):
         
         if "loaded_model" in MODELS[model_type][model_name]:
             loaded_model = MODELS[model_type][model_name]["loaded_model"]
+
+        function_params = MODELS[model_type][model_name]["function_params"]
     
     except Exception as e:
         print(e)
-        return None, None, None, None
+        return None, None, None, None, None
     
     
-    return model_name, model_function, loaded_model, dataframe_fields
+    return model_name, model_function, loaded_model, dataframe_fields, function_params
 
 
 ###############################################
@@ -87,26 +89,50 @@ def process_data(data, model, version=None):
     except:
         return error("Data received isn't a valid JSON.")
     
-    model_name, model_function, loaded_model, dataframe_fields = get_model_function(model)
+    model_name, model_function, loaded_model, dataframe_fields, function_params = get_model_function(model)
     if model_function is None:
         return error('Unknow model ' + model + '.')
     
     if len(data_json) > 0:
         result = None
-        if "result" not in data_json:
+        id, tp, data_frame, total_ms = None, None, None, None
+        js_result = None
+        if "result" not in data_json: # build dataframe
             result = util.build_dataframe(data_json, dataframe_fields)
-        else:
-            result = util.build_dataframe(data_json["result"], dataframe_fields)
+
+            if result is None:
+                return error("Unable to build dataframe from data received. Data must be compatible with choosen model: " + model)
+            
+            id, tp, data_frame, total_ms = result
+
+            js_result = model_function(data_frame)
+        else: # do not build dataframe
+            #result = util.build_dataframe(data_json["result"], dataframe_fields)
+            if function_params is None:
+                js_result = model_function(data_json["result"])
+            else:
+                f_args = []
+                for item in function_params:
+                    if item not in data_json and function_params[item]:
+                        return error("Missing key \"" + item + "\" in query")
+                    
+                    f_args.append(data_json[item])
+                
+                def wrapper(*args):
+                    return model_function(args)
+                
+                js_result = wrapper(f_args)
+
             tc_format = False
 
-        if result is None:
-            return error("Unable to build dataframe from data received. Data must be compatible with choosen model: " + model)
+        # if result is None:
+        #     return error("Unable to build dataframe from data received. Data must be compatible with choosen model: " + model)
         
-        id, tp, data_frame, total_ms = result
-        if loaded_model:
-            js_result = model_function(data_frame, model_function) # processed data frame
-        else:
-            js_result = model_function(data_frame) # processed data frame
+        # id, tp, data_frame, total_ms = result
+        # if loaded_model:
+        #     js_result = model_function(data_frame, model_function) # processed data frame
+        # else:
+        #     js_result = model_function(data_frame) # processed data frame
 
         if js_result is None:
             return error("Unable to apply model '" + model + "' in received data.")
@@ -292,7 +318,7 @@ def load_conf(conf_file="server_conf.json"):
             if os.path.exists(req_file):
                 cmd = subprocess.run(["pip", "install", "-r", req_file])
                 if cmd:
-                    print("Failed to install requirements of package/model \"{}\".".format(item))
+                    print(">>> Failed to install (or already met) requirements of package/model \"{}\".".format(item))
 
             for model_name in models_conf:
                 model = models_conf[model_name]

@@ -1,0 +1,13 @@
+{
+    "hour_model": {
+        "py_module": "borescope_model_test.py",
+        "py_function": "bore_model",
+        "function_params": {
+            "model_name": true,
+            "src": true,
+            "dst": true,
+            "result": true,
+            "path": false
+        }
+    }
+}
