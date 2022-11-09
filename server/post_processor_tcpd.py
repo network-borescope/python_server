@@ -37,13 +37,13 @@ def error(error_desc):
 ###############################################
 def know_models(model):
     try:
-        model_type, model_name = model[1:].split("/")
-        return model_type, model_name
+        model_dir, model_name = model[1:].split("/")
+        return model_dir, model_name
     except:
-        for know_model_type in MODELS:
-            for know_model_name in MODELS[know_model_type]:
+        for know_model_dir in MODELS:
+            for know_model_name in MODELS[know_model_dir]:
                 if know_model_name == model:
-                    return know_model_type, know_model_name
+                    return know_model_dir, know_model_name
     
         return None, None
 
@@ -57,22 +57,27 @@ def get_model_function(model):
         # if model == "/":
         #     model = DEFAULT_MODEL
       
-        model_type, model_name = know_models(model)
-        model_function = MODELS[model_type][model_name]["model_function"]
-        dataframe_fields = MODELS[model_type][model_name]["dataframe_fields"]
-        loaded_model = None
+        model_dir, model_name = know_models(model)
+        model_function = MODELS[model_dir][model_name]["model_function"]
         
-        if "loaded_model" in MODELS[model_type][model_name]:
-            loaded_model = MODELS[model_type][model_name]["loaded_model"]
+        dataframe_fields = None
+        if "dataframe_fields" in MODELS[model_dir][model_name]:
+            dataframe_fields = MODELS[model_dir][model_name]["dataframe_fields"]
+        
+        loaded_model = None
+        if "loaded_model" in MODELS[model_dir][model_name]:
+            loaded_model = MODELS[model_dir][model_name]["loaded_model"]
 
-        function_params = MODELS[model_type][model_name]["function_params"]
+        function_params = None
+        if "function_params" in MODELS[model_dir][model_name]:
+            function_params = MODELS[model_dir][model_name]["function_params"]
     
     except Exception as e:
         print(e)
-        return None, None, None, None, None
+        return None, None, None, None, None, None
     
     
-    return model_name, model_function, loaded_model, dataframe_fields, function_params
+    return model_name, model_function, loaded_model, dataframe_fields, function_params, model_dir
 
 
 ###############################################
@@ -89,7 +94,7 @@ def process_data(data, model, version=None):
     except:
         return error("Data received isn't a valid JSON.")
     
-    model_name, model_function, loaded_model, dataframe_fields, function_params = get_model_function(model)
+    model_name, model_function, loaded_model, dataframe_fields, function_params, model_dir = get_model_function(model)
     if model_function is None:
         return error('Unknow model ' + model + '.')
     
@@ -111,28 +116,28 @@ def process_data(data, model, version=None):
             if function_params is None:
                 js_result = model_function(data_json["result"])
             else:
+                #f_args = {}
                 f_args = []
                 for item in function_params:
-                    if item not in data_json and function_params[item]:
+                    if item in data_json:
+                        #f_args[item] = data_json[item]
+                        f_args.append(data_json[item])
+
+                    elif function_params[item]:
                         return error("Missing key \"" + item + "\" in query")
                     
-                    f_args.append(data_json[item])
+                #def wrapper(args_dict):
+                    #return model_function(**args_dict)
                 
-                def wrapper(*args):
-                    return model_function(args)
+                def wrapper(args_list):
+                    os.chdir(model_dir)
+                    result = model_function(*args_list)
+                    os.chdir('../')
+                    return result
                 
                 js_result = wrapper(f_args)
 
             tc_format = False
-
-        # if result is None:
-        #     return error("Unable to build dataframe from data received. Data must be compatible with choosen model: " + model)
-        
-        # id, tp, data_frame, total_ms = result
-        # if loaded_model:
-        #     js_result = model_function(data_frame, model_function) # processed data frame
-        # else:
-        #     js_result = model_function(data_frame) # processed data frame
 
         if js_result is None:
             return error("Unable to apply model '" + model + "' in received data.")

@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-#from tensorflow.keras.models import load_model
+from tensorflow.keras.models import load_model
 import json
 
 STATES_FROM_NUMBER = {1: "ac",
@@ -33,7 +33,8 @@ STATES_FROM_NUMBER = {1: "ac",
 
 
 def x_from_json(f):
-    d = json.load(f)
+    #d = json.load(f)
+    d = f
     df = pd.json_normalize(d['result'])
     df['v'] = df['v'].apply(lambda x: x[0])
     X = df[['v']].iloc[-24:].to_numpy().reshape((1, 24, 1))
