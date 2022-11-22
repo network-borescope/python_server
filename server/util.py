@@ -160,6 +160,46 @@ def build_tc_response(response, keys=[], output_res=[]):
     return output_res
 
 
+def get_tc_result_info(ts_result):
+    id = None
+    tp = None
+    total_ms = 0.0
+    
+    def get_info(result):
+        info = [None, None, None]
+
+        if "id" in result:
+            info[0] = result["id"]
+
+        if "tp" in result:
+            info[1] = result["tp"]
+
+        if "ms" in result:
+            info[2] = result["ms"]
+        
+        return info
+
+    if type(ts_result) == list:
+        for result in ts_result:
+            info = None
+            if "data" in result:
+                info = get_info(result["data"])
+            else:
+                info = get_info(result)
+            
+            if id is None and info[0]: id = info[0]
+            if tp is None and info[1]: tp = info[1]
+            if info[2]: total_ms += info[2]
+    
+    elif type(ts_result) == dict:
+        info = get_info(ts_result)
+
+        if id is None: id = info[0]
+        if tp is None: tp = info[1]
+        if info[2]: total_ms += info[2]
+    
+    return id, tp, total_ms
+
 
 if __name__ == "__main__":
     import sys

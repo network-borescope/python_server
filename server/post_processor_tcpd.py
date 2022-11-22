@@ -53,9 +53,11 @@ def know_models(model):
 ## Get choosen model function and fields
 ###############################################
 def get_model_function(model):
+    model_info = None
     try:
         # if model == "/":
         #     model = DEFAULT_MODEL
+        model_info = {}
       
         model_dir, model_name = know_models(model)
         model_function = MODELS[model_dir][model_name]["model_function"]
@@ -64,20 +66,24 @@ def get_model_function(model):
         if "dataframe_fields" in MODELS[model_dir][model_name]:
             dataframe_fields = MODELS[model_dir][model_name]["dataframe_fields"]
         
-        loaded_model = None
-        if "loaded_model" in MODELS[model_dir][model_name]:
-            loaded_model = MODELS[model_dir][model_name]["loaded_model"]
-
         function_params = None
         if "function_params" in MODELS[model_dir][model_name]:
             function_params = MODELS[model_dir][model_name]["function_params"]
+        
+        model_info = {
+            "name": model_name,
+            "dir": model_dir,
+            "function": model_function,
+            "function_params": function_params,
+            "dataframe_fields": dataframe_fields
+        }
     
     except Exception as e:
         print(e)
-        return None, None, None, None, None, None
+        return None
     
     
-    return model_name, model_function, loaded_model, dataframe_fields, function_params, model_dir
+    return model_info
 
 
 ###############################################
@@ -94,63 +100,63 @@ def process_data(data, model, version=None):
     except:
         return error("Data received isn't a valid JSON.")
     
-    model_name, model_function, loaded_model, dataframe_fields, function_params, model_dir = get_model_function(model)
-    if model_function is None:
+    model_info = get_model_function(model)
+    if model_info is None:
         return error('Unknow model ' + model + '.')
     
-    if len(data_json) > 0:
-        result = None
-        id, tp, data_frame, total_ms = None, None, None, None
+    if len(data_json) == 0:
+        return error("Data length equals to 0, no data to be processed.")
+    else:
         js_result = None
-        if "result" not in data_json: # build dataframe
-            result = util.build_dataframe(data_json, dataframe_fields)
 
-            if result is None:
-                return error("Unable to build dataframe from data received. Data must be compatible with choosen model: " + model)
-            
-            id, tp, data_frame, total_ms = result
-
-            js_result = model_function(data_frame)
-        else: # do not build dataframe
-            #result = util.build_dataframe(data_json["result"], dataframe_fields)
-            if function_params is None:
-                js_result = model_function(data_json["result"])
+        id, tp, total_ms = util.get_tc_result_info(data_json)
+        print(id, tp, total_ms)
+        if tp == 0:
+            error("Received data with tp 0.")
+        
+        # the only parameter in the "model function" is the data
+        if model_info["function_params"] is None:
+            if type(data_json) == dict:
+                js_result = model_info["function"](data_json["result"])
             else:
-                #f_args = {}
-                f_args = []
-                for item in function_params:
-                    if item in data_json:
-                        #f_args[item] = data_json[item]
-                        f_args.append(data_json[item])
+                js_result = model_info["function"](data_json)
+        
+        else: # complex function
+            f_args = []
+            for item in model_info["function_params"]:
+                if item in data_json:
+                    #f_args[item] = data_json[item]
+                    f_args.append(data_json[item])
 
-                    elif function_params[item]:
-                        return error("Missing key \"" + item + "\" in query")
-                    
-                #def wrapper(args_dict):
-                    #return model_function(**args_dict)
+                elif model_info["function_params"][item]:
+                    return error("Missing key \"" + item + "\" in query")
                 
-                def wrapper(args_list):
-                    os.chdir(model_dir)
-                    result = model_function(*args_list)
-                    os.chdir('../')
-                    return result
-                
-                js_result = wrapper(f_args)
-
-            tc_format = False
+            #def wrapper(args_dict):
+                #return model_function(**args_dict)
+            
+            def wrapper(args_list):
+                os.chdir(model_info["dir"])
+                result = model_info["function"](*args_list)
+                os.chdir('../')
+                return result
+            
+            js_result = wrapper(f_args)
 
         if js_result is None:
             return error("Unable to apply model '" + model + "' in received data.")
-    else:
-        return error("No data to be processed.")
 
     elapsed = (time.process_time() - start)*1000 # multiply by 1000 to convert to milliseconds
     
+    # use tc_format only if has id, tp and total_ms
+    if not (id and tp and total_ms):
+        tc_format = False
+    
     response_json = None
     if tc_format:
-        response_json = {"id": id, "tp": tp, "result": js_result, "model": model_name, "ms": total_ms + elapsed}
+        response_json = {"id": id, "tp": tp, "result": js_result, "model": model_info["name"], "ms": total_ms + elapsed}
     else:
-        response_json = {"result": js_result, "model": model_name}
+        response_json = {"result": js_result, "model": model_info["name"]}
+    
     return response_json
 
 
