@@ -89,7 +89,7 @@ def get_model_function(model):
 ###############################################
 ## Process Received Data
 ###############################################
-def process_data(data, model, version=None):
+def process_data(data, model, version, model_file):
     print("Process data", model)
     tc_format = True # response in tinycubes format
     
@@ -113,34 +113,26 @@ def process_data(data, model, version=None):
         print(id, tp, total_ms)
         if tp == 0:
             error("Received data with tp 0.")
-        
-        # the only parameter in the "model function" is the data
-        if model_info["function_params"] is None:
+
+        try:
             if type(data_json) == dict:
                 js_result = model_info["function"](data_json["result"])
-            else:
-                js_result = model_info["function"](data_json)
-        
-        else: # complex function
-            f_args = []
-            for item in model_info["function_params"]:
-                if item in data_json:
-                    #f_args[item] = data_json[item]
-                    f_args.append(data_json[item])
-
-                elif model_info["function_params"][item]:
-                    return error("Missing key \"" + item + "\" in query")
-                
-            #def wrapper(args_dict):
-                #return model_function(**args_dict)
-            
-            def wrapper(args_list):
-                os.chdir(model_info["dir"])
-                result = model_info["function"](*args_list)
-                os.chdir('../')
-                return result
-            
-            js_result = wrapper(f_args)
+            elif type(data_json) == list:
+                if not model_file:
+                    js_result = model_info["function"](data_json)
+                else:
+                    model_file_full_path = os.path.join(os.getcwd(), model_info["dir"], model_file)
+                    #print("FILE EXISTS:", model_file_full_path)
+                    f_args_dict = {
+                            "model_name": model_info["name"],
+                            "data": data_json,
+                            "model_file": model_file_full_path
+                        }
+                    
+                    # pass dict as param
+                    js_result = model_info["function"](**f_args_dict)
+        except Exception as e:
+            print(e)
 
         if js_result is None:
             return error("Unable to apply model '" + model + "' in received data.")
@@ -221,6 +213,7 @@ def conn_task(conn, addr, thread_count):
         header_end = None # header end position
         version = None # protocol version
         model = None # desired model
+        model_file = None # model that uses a file
         buffer_str = None # current string in buffer
         response_json = None # awnser that will be sent
 
@@ -229,8 +222,12 @@ def conn_task(conn, addr, thread_count):
         header_end = header_parser(buffer_str)
 
         if header_end:
-            _, version, model = buffer_str[:header_end].split(" ") # "# <version> <model>"
+            params = buffer_str[:header_end].split(" ") # "# <version> <model>"
+            _, version, model = params[:3]
+            if len(params) == 4:
+                model_file = params[3].strip()
             model = model.strip().lower()
+
             buffer_str = buffer_str[header_end+1:]
 
         while True:
@@ -242,7 +239,7 @@ def conn_task(conn, addr, thread_count):
                         data += buffer_str
                         
                         # processing data
-                        response_json = process_data(data, model, version)
+                        response_json = process_data(data, model, version, model_file)
 
                     # sending awnser
                     response_str = json.JSONEncoder().encode(response_json)

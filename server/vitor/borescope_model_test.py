@@ -41,20 +41,23 @@ def x_from_json(f):
     return X
 
 
-def x_from_args(lst_json):
+def x_from_args(data):
     lst_x = []
-    for js in lst_json:
+    for js in data:
         x_i = x_from_json(js)
         lst_x.append(x_i)
     return np.concatenate(lst_x, axis=2)
 
 
-def bore_model(model_name, from_state, to_state, lst_json, path="models/"):
-    f_state = STATES_FROM_NUMBER[from_state]
-    t_state = STATES_FROM_NUMBER[to_state]
-    if model_name == 'hour_model':
-        model = load_model(f"{path}rtt_up_{f_state}_to_{t_state}_target_rtt_avg.h5")
-        x = x_from_args(lst_json)
+#def bore_model(model_name, from_state, to_state, lst_json, path="models/"):
+def bore_model(model_name, data, model_file):
+    #f_state = STATES_FROM_NUMBER[from_state]
+    #t_state = STATES_FROM_NUMBER[to_state]
+    #if model_name == 'hour_model':
+        #model = load_model(f"{path}rtt_up_{f_state}_to_{t_state}_target_rtt_avg.h5")
+    if model_name == "lstm-1h":
+        model = load_model(model_file)
+        x = x_from_args(data)
         result = model.predict(x)
         if result[0][0] > 0.5:
             return [1]

@@ -1,13 +1,6 @@
 {
-    "hour_model": {
+    "lstm-1h": {
         "py_module": "borescope_model_test",
-        "py_function": "bore_model",
-        "function_params": {
-            "model_name": true,
-            "src": true,
-            "dst": true,
-            "result": true,
-            "path": false
-        }
+        "py_function": "bore_model"
     }
 }
