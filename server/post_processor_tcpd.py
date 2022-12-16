@@ -4,6 +4,8 @@ import pickle
 import threading
 import time
 import importlib
+import os
+import subprocess
 
 # server utilitie libraries
 import util
@@ -13,8 +15,9 @@ import util
 HOST = None
 SERVER_PORT = None
 MAX_DATA_SIZE = None
+CONN_TIMEOUT_S = None
 MODELS = None
-DEFAULT_MODEL = None
+# DEFAULT_MODEL = None
 BUFFER_SIZE = 4096
 
 
@@ -34,13 +37,13 @@ def error(error_desc):
 ###############################################
 def know_models(model):
     try:
-        model_type, model_name = model[1:].split("/")
-        return model_type, model_name
+        model_dir, model_name = model[1:].split("/")
+        return model_dir, model_name
     except:
-        for know_model_type in MODELS:
-            for know_model_name in MODELS[know_model_type]:
+        for know_model_dir in MODELS:
+            for know_model_name in MODELS[know_model_dir]:
                 if know_model_name == model:
-                    return know_model_type, know_model_name
+                    return know_model_dir, know_model_name
     
         return None, None
 
@@ -50,30 +53,43 @@ def know_models(model):
 ## Get choosen model function and fields
 ###############################################
 def get_model_function(model):
+    model_info = None
     try:
-        if model == "/":
-            model = DEFAULT_MODEL
+        # if model == "/":
+        #     model = DEFAULT_MODEL
+        model_info = {}
       
-        model_type, model_name = know_models(model)
-        model_function = MODELS[model_type][model_name]["model_function"]
-        dataframe_fields = MODELS[model_type][model_name]["dataframe_fields"]
-        loaded_model = None
+        model_dir, model_name = know_models(model)
+        model_function = MODELS[model_dir][model_name]["model_function"]
         
-        if "loaded_model" in MODELS[model_type][model_name]:
-            loaded_model = MODELS[model_type][model_name]["loaded_model"]
+        dataframe_fields = None
+        if "dataframe_fields" in MODELS[model_dir][model_name]:
+            dataframe_fields = MODELS[model_dir][model_name]["dataframe_fields"]
+        
+        function_params = None
+        if "function_params" in MODELS[model_dir][model_name]:
+            function_params = MODELS[model_dir][model_name]["function_params"]
+        
+        model_info = {
+            "name": model_name,
+            "dir": model_dir,
+            "function": model_function,
+            "function_params": function_params,
+            "dataframe_fields": dataframe_fields
+        }
     
     except Exception as e:
         print(e)
-        return None, None, None, None
+        return None
     
     
-    return model_name, model_function, loaded_model, dataframe_fields
+    return model_info
 
 
 ###############################################
 ## Process Received Data
 ###############################################
-def process_data(data, model, version=None):
+def process_data(data, model, version, model_file):
     print("Process data", model)
     tc_format = True # response in tinycubes format
     
@@ -84,58 +100,79 @@ def process_data(data, model, version=None):
     except:
         return error("Data received isn't a valid JSON.")
     
-    model_name, model_function, loaded_model, dataframe_fields = get_model_function(model)
-    if model_function is None:
+    model_info = get_model_function(model)
+    if model_info is None:
         return error('Unknow model ' + model + '.')
     
-    if len(data_json) > 0:
-        result = None
-        if "result" not in data_json:
-            result = util.build_dataframe(data_json, dataframe_fields)
-        else:
-            result = util.build_dataframe(data_json["result"], dataframe_fields)
-            tc_format = False
+    if len(data_json) == 0:
+        return error("Data length equals to 0, no data to be processed.")
+    else:
+        js_result = None
 
-        if result is None:
-            return error("Unable to build dataframe from data received. Data must be compatible with choosen model: " + model)
-        
-        id, tp, data_frame, total_ms = result
-        if loaded_model:
-            js_result = model_function(data_frame, model_function) # processed data frame
-        else:
-            js_result = model_function(data_frame) # processed data frame
+        id, tp, total_ms = util.get_tc_result_info(data_json)
+        print(id, tp, total_ms)
+        if tp == 0:
+            error("Received data with tp 0.")
+
+        try:
+            if type(data_json) == dict:
+                js_result = model_info["function"](data_json["result"])
+            elif type(data_json) == list:
+                if len(data_json) == 1:
+                    js_result = model_info["function"](data_json[0])
+                if not model_file:
+                    js_result = model_info["function"](data_json)
+                else:
+                    model_file_full_path = os.path.join(os.getcwd(), model_info["dir"], model_file)
+                    #print("FILE EXISTS:", model_file_full_path)
+                    f_args_dict = {
+                            "model_name": model_info["name"],
+                            "data": data_json,
+                            "model_file": model_file_full_path
+                        }
+                    
+                    # pass dict as param
+                    js_result = model_info["function"](**f_args_dict)
+        except Exception as e:
+            print(e)
 
         if js_result is None:
             return error("Unable to apply model '" + model + "' in received data.")
-    else:
-        return error("No data to be processed.")
 
     elapsed = (time.process_time() - start)*1000 # multiply by 1000 to convert to milliseconds
     
+    # use tc_format only if has id, tp and total_ms
+    if not (id and tp and total_ms):
+        tc_format = False
+    
     response_json = None
     if tc_format:
-        response_json = {"id": id, "tp": tp, "result": js_result, "model": model_name, "ms": total_ms + elapsed}
+        response_json = {"id": id, "tp": tp, "result": js_result, "model": model_info["name"], "ms": total_ms + elapsed}
     else:
-        response_json = {"result": js_result, "model": model_name}
+        response_json = {"result": js_result, "model": model_info["name"]}
+    
     return response_json
 
 
 ###############################################
 ## Protocol Header Parser
 ###############################################
-def header_parser(str):
+def header_parser(header):
+    if header[:2] != "# ":
+        return None
+
     version = ""
     i = 2 # index begins at 2 because str begins with "# "
     
     # must start with version number
-    if not ("0" <= str[i] <= "9"):
+    if not ("0" <= header[i] <= "9"):
         return None
-    version += str[i]
+    version += header[i]
 
     i += 1
     while True: # get rest of version number(float)
-        if ("0" <= str[i] <= "9") or str[i] == ".":
-            version += str[i]
+        if ("0" <= header[i] <= "9") or header[i] == ".":
+            version += header[i]
             i += 1
         else:
             break # end of version number
@@ -145,18 +182,18 @@ def header_parser(str):
     except ValueError:
         return None
     
-    if str[i] != " ":
+    if header[i] != " ":
         return None
     i += 1 # consume whitespace
 
     # must be "/" to indentify model
-    #if str[i] != "/":
+    #if header[i] != "/":
         #return None
     
-    while i < len(str):
-        if str[i] == "\r":
+    while i < len(header):
+        if header[i] == "\r":
             i += 1
-            if str[i] == "\n":
+            if header[i] == "\n":
                 return i # end of the HEADER
             else:
                 return None
@@ -178,51 +215,56 @@ def conn_task(conn, addr, thread_count):
         header_end = None # header end position
         version = None # protocol version
         model = None # desired model
+        model_file = None # model that uses a file
         buffer_str = None # current string in buffer
         response_json = None # awnser that will be sent
-        
+
+        # process header
+        buffer_str = conn.recv(BUFFER_SIZE).decode("utf-8")
+        header_end = header_parser(buffer_str)
+
+        if header_end:
+            params = buffer_str[:header_end].split(" ") # "# <version> <model>"
+            _, version, model = params[:3]
+            if len(params) == 4:
+                model_file = params[3].strip()
+            model = model.strip().lower()
+
+            buffer_str = buffer_str[header_end+1:]
+
         while True:
-            buffer = conn.recv(BUFFER_SIZE)
-            buffer_str = buffer.decode("utf-8")
+            try:
+                if buffer_str[-4:] == "\r\n\r\n":
+                    if header_end is None:
+                        response_json = error("Missing Header. Expected '# <version> <path>'.")
+                    else:
+                        data += buffer_str
+                        
+                        # processing data
+                        response_json = process_data(data, model, version, model_file)
 
-            if buffer_str[:2] == "# ":
-                header_end = header_parser(buffer_str)
-
-                if header_end is None:
-                    response_json = error("Header Error. Expected \"# <version> <path>\"")
-
-                    # sending error message
+                    # sending awnser
                     response_str = json.JSONEncoder().encode(response_json)
                     response_bytes = response_str.encode("utf-8")
                     conn.sendall(response_bytes)
                     
                     # closing connection
+                    break 
+
+                data += buffer_str
+
+                if len(data) > MAX_DATA_SIZE:
                     break
                 
-                _, version, model = buffer_str[:header_end].split(" ") # "# <version> <model>"
-                model = model.strip().lower()
-                buffer_str = buffer_str[header_end+1:]
-
-            if buffer_str[-4:] == "\r\n\r\n":
-                if header_end is None:
-                    response_json = error("Missing Header. Expected \"# <version> <path>\"")
-                else:
-                    data += buffer_str
-                    # processing data
-                    response_json = process_data(data, model, version)
-
-                # sending awnser
+                buffer_str = conn.recv(BUFFER_SIZE).decode("utf-8")
+            
+            except socket.timeout as e:
+                response_json = error("Connection timeout.")
                 response_str = json.JSONEncoder().encode(response_json)
                 response_bytes = response_str.encode("utf-8")
                 conn.sendall(response_bytes)
-                
-                # closing connection
-                break 
-
-            data += buffer_str
-
-            if len(data) > MAX_DATA_SIZE:
                 break
+
 
         print("Closed connection with", addr, "-> Thread", thread_count)  
 
@@ -248,7 +290,7 @@ def load_models(reload=False):
 ## Load server conf
 ###############################################
 def load_conf(conf_file="server_conf.json"):
-    global HOST, SERVER_PORT, MAX_DATA_SIZE, DEFAULT_MODEL, MODELS
+    global HOST, SERVER_PORT, MAX_DATA_SIZE, CONN_TIMEOUT_S, DEFAULT_MODEL, MODELS
 
     server_conf = None
     with open(conf_file, "r") as f:
@@ -258,27 +300,64 @@ def load_conf(conf_file="server_conf.json"):
         HOST = server_conf["host"]
         SERVER_PORT = server_conf["port"]
         MAX_DATA_SIZE = server_conf["max_data_sz"]
-        MODELS = server_conf["models"]
-        for model_type in MODELS:
-            for model_name in MODELS[model_type]:
-                model_options = MODELS[model_type][model_name]                                 
-                m = MODELS[model_type][model_name]
-
-                module = importlib.import_module(model_options.pop("py_module"))
-                m["model_function"] = getattr(module, model_options.pop("py_function"))
-
-                # model that has to be loaded
-                if "model_file" in m:
-                    m["loaded_model"] = False
-
-                if DEFAULT_MODEL is None:
-                    DEFAULT_MODEL = "/" + model_type + "/" + model_name
+        CONN_TIMEOUT_S = server_conf["conn_timeout_sec"]
                 
     except Exception as e:
-        print(e)
+        print("server_conf.json file error", e)
         return False
 
-    print(HOST, SERVER_PORT, MAX_DATA_SIZE, DEFAULT_MODEL)
+    # search for models(modules)
+    MODELS = {}
+    imported_modules = {} # imported python files
+
+    # scan current dir for python models
+    for item in os.listdir():
+        if item[0] == '.' or item[:2] == "__" or not os.path.isdir(item):
+            continue
+        
+        conf_file = item+"/conf.json"
+        if not os.path.exists(conf_file):
+            continue
+        
+        # look for conf file of the model
+        with open(conf_file, "r") as f:
+            models_conf = json.load(f)
+
+            # install module dependencies from requirements file
+            req_file = "{}/requirements.txt".format(item)
+            if os.path.exists(req_file):
+                cmd = subprocess.run(["pip", "install", "-r", req_file])
+                if cmd:
+                    print(">>> Failed to install (or already met) requirements of package/model \"{}\".".format(item))
+
+            for model_name in models_conf:
+                model = models_conf[model_name]
+
+                py_module = "{}.{}".format(item, model.pop("py_module"))
+                
+                module = None # obj representing imported python file
+                if py_module not in imported_modules:
+                    module = importlib.import_module(py_module)
+                    imported_modules[py_module] = module
+                else:
+                    module = imported_modules[py_module]
+
+                if "py_class" in model:
+                    module_class = getattr(module, model.pop("py_class"))
+                    model["model_function"] = getattr(module_class, model.pop("py_function"))
+                else:
+                    model["model_function"] = getattr(module, model.pop("py_function"))
+
+                if item not in MODELS:
+                    MODELS[item] = {}
+                
+                MODELS[item][model_name] = model
+
+                # if DEFAULT_MODEL is None:
+                #     DEFAULT_MODEL = "/{}/{}".format(item, model_name)
+
+    # print(HOST, SERVER_PORT, MAX_DATA_SIZE, DEFAULT_MODEL)
+    print(HOST, SERVER_PORT, MAX_DATA_SIZE)
     return True
 
 
@@ -294,13 +373,14 @@ if __name__ == "__main__":
         s.bind((HOST, SERVER_PORT))
         s.listen()
         
-        load_models()
-        print("TCP Server Started ({}, {})!!!".format(HOST, SERVER_PORT))
+        # load_models()
+        print("TCP Server Started ({}, {}).".format(HOST, SERVER_PORT))
 
         queue = [] # [(conn, addr)]
 
         while True:
             conn, addr = s.accept()
+            conn.settimeout(CONN_TIMEOUT_S)
     
             t = threading.Thread(target=conn_task, args=(conn, addr, threading.active_count()))
             t.start()

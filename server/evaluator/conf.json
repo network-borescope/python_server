@@ -1,0 +1,18 @@
+{
+    "knn": {
+        "py_module": "evaluator",
+        "py_function": "process_knn"
+    },
+    "svm": {
+        "py_module": "evaluator",
+        "py_function": "process_svm"
+    },
+    "decisiontree": {
+        "py_module": "evaluator",
+        "py_function": "process_decisionTree"
+    },
+    "_": {
+        "py_module": "evaluator",
+        "py_function": "process_all"
+    }
+}

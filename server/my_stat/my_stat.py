@@ -67,7 +67,46 @@ def all(data_list):
     return results
 
 
-def process_df(df, processfunction):
+def build_dataframe(data):
+    df_columns = ["pop", "service", "timestamp", "time"]
+    df_rows = []
+
+    def extract_info(obj):
+        if obj["data"]["tp"] == 0: return
+
+        row_prefix = [obj["pop"], obj["service"]]
+
+        for result_data in obj["data"]["result"]:
+            row = [result_data["k"][0], result_data["v"][0]]
+
+            row = row_prefix+row
+            
+            if len(row) == len(df_columns):
+                df_rows.append(row)
+            else:
+                print(row)
+    
+    if type(data) == list:
+        for obj in data:
+            extract_info(obj)
+    else:
+        extract_info(data)
+
+    df = None
+    try:
+        df = pd.DataFrame(df_rows, columns=df_columns)
+    except Exception as e:
+        print(e)
+        return None
+    
+    return df
+
+
+def process(data, processfunction):
+    df = build_dataframe(data)
+    
+    if df is None: return
+
     response = {}
     pops = list(map(int, df["pop"].unique()))
     servs = list(map(int, df["service"].unique()))
@@ -88,10 +127,10 @@ def process_df(df, processfunction):
     return response
 
 
-def process_all(df): return process_df(df, all)
+def process_all(data): return process(data, all)
 
-def process_cdf(df): return process_df(df, cdf)
+def process_cdf(data): return process(data, cdf)
 
-def process_ccdf(df): return process_df(df, ccdf)
+def process_ccdf(data): return process(data, ccdf)
 
-def process_pdf(df): return process_df(df, pdf)
+def process_pdf(data): return process(data, pdf)

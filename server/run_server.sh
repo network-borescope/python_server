@@ -13,7 +13,10 @@ fi
 # activate virtual env
 . .env/bin/activate
 
-# installing requirements
+# update pip
+pip install --upgrade pip
+
+# installing server requirements
 pip install -r requirements.txt
 
 # run server
