@@ -118,6 +118,8 @@ def process_data(data, model, version, model_file):
             if type(data_json) == dict:
                 js_result = model_info["function"](data_json["result"])
             elif type(data_json) == list:
+                if len(data_json) == 1:
+                    js_result = model_info["function"](data_json[0])
                 if not model_file:
                     js_result = model_info["function"](data_json)
                 else:

@@ -71,8 +71,8 @@ def build_dataframe(data):
     df_columns = ["pop", "service", "timestamp", "time"]
     df_rows = []
 
-    for obj in data:
-        if obj["data"]["tp"] == 0: continue
+    def extract_info(obj):
+        if obj["data"]["tp"] == 0: return
 
         row_prefix = [obj["pop"], obj["service"]]
 
@@ -85,6 +85,12 @@ def build_dataframe(data):
                 df_rows.append(row)
             else:
                 print(row)
+    
+    if type(data) == list:
+        for obj in data:
+            extract_info(obj)
+    else:
+        extract_info(data)
 
     df = None
     try:

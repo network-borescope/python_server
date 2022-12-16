@@ -5,8 +5,8 @@ MAX_LEN = 100
 def get_kv(data):
     kv = {}
     #obj = json.loads(data)
-    #lst = list(obj.values())[2]
     lst = data
+    lst = list(obj.values())[2]
 
     # Get only list tail of length MAX_LEN 
     if len(lst) > MAX_LEN:
