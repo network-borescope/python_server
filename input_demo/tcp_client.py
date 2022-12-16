@@ -2,7 +2,8 @@ import socket
 import sys
 
 if len(sys.argv) != 3 and len(sys.argv) != 4:
-    print("Usage: python3 client_tcp.py <tc_result.json> <model>")
+    print("Usage 1: python3 client_tcp.py <tc_result.json> <model>")
+    print("Usage 2: python3 client_tcp.py <tc_result.json> <model> <model_file>")
     sys.exit(1)
 
 filename = sys.argv[1]

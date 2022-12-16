@@ -340,7 +340,11 @@ def load_conf(conf_file="server_conf.json"):
                 else:
                     module = imported_modules[py_module]
 
-                model["model_function"] = getattr(module, model.pop("py_function"))
+                if "py_class" in model:
+                    module_class = getattr(module, model.pop("py_class"))
+                    model["model_function"] = getattr(module_class, model.pop("py_function"))
+                else:
+                    model["model_function"] = getattr(module, model.pop("py_function"))
 
                 if item not in MODELS:
                     MODELS[item] = {}

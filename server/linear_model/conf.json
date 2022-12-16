@@ -1,0 +1,12 @@
+{
+    "linear-regression": {
+        "py_module": "linear_regression",
+        "py_class": "LinearRegression",
+        "py_function": "predict_next"
+    },
+    "pa-regressor": {
+        "py_module": "pa_regressor",
+        "py_class": "PARegressor",
+        "py_function": "predict_next"
+    }
+}
